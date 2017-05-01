@@ -37,8 +37,8 @@ namespace DifferentialEvolution{
     public:
         std::vector<std::pair<double,double> > bounds;
         std::size_t popsize;
-        double F = 1;
-        double CR = 0.5;
+        double F = 1; ///< Differential weight
+        double CR = 0.5; ///< Crossover probability
         double epsilon_ftol = -1e30; ///< If the functional value is less than this value, we terminate
     };
 
@@ -59,38 +59,47 @@ namespace DifferentialEvolution{
             config.bounds = bounds;
             config.popsize = popsize;
         };
+        /// Generate the initial population of individuals
         void initialize(){
+            // Loop over the individuals in the population
             for (auto iind = 0; iind < config.popsize; ++iind){
+                
+                // Generate the coefficients for this individual based on the bounds specified
                 std::vector<double> v;
                 for(auto &lb_ub : config.bounds){
                     v.push_back(std::uniform_real_distribution<>(lb_ub.first, lb_ub.second)(gen));
                 }
                 this->population.push_back(Individual(v));
             }
+            // Evaluate the costs for each individual
             for (auto &ind: this->population){
                 ind.set_cost(this->f(ind.get_coeff()));
             }
         }
+        /// Return a reference to the config
         DifferentialEvolutionConfiguration & get_config(){ return config; };
+        /// Get N unique indices
         std::vector<std::size_t> get_N_unique(std::size_t Nindices, std::size_t N){
-            assert(N < Nindices);
+            assert(N <= Nindices);
             // Short circuit if you want as many indices as the length
             if (N == Nindices){
                 std::vector<std::size_t> out(N);
                 for (auto i = 0; i < N; ++i){ out[i] = i; }
                 return out;
             }
+            // Otherwise, find N unique indices, each  >= 0 and <= Nindices
             std::uniform_int_distribution<> dis(0, Nindices);
             std::vector<std::size_t> indices;
             for (auto i = 0; i < N; ++i){
                 while (true){
+                    // Trial index
                     auto j = dis(gen);
                     if (std::find(indices.begin(), indices.end(), j) != indices.end()){
                         // It's already in the list of indices to keep; keep trying
                         continue;
                     }
                     else{
-                        // Not there yet; keep it
+                        // Not being used yet; keep it
                         indices.push_back(j);
                         break;
                     }
@@ -112,7 +121,7 @@ namespace DifferentialEvolution{
             }
             return Individual(vn);
         }
-
+        // Do one generation
         void do_generation(){
             auto Ncoeff = this->population[0].get_coeff().size();
             for (auto counter = 0; counter < config.popsize; ++counter){
@@ -136,6 +145,7 @@ namespace DifferentialEvolution{
                     std::swap(this->population[uniques[0]], cand);
                 }
             }
+            // Sort the individuals in increasing cost
             std::sort(this->population.begin(),
                       this->population.end(),
                       [](const Individual &ind1, const Individual &ind2){
@@ -143,9 +153,10 @@ namespace DifferentialEvolution{
                       });
             
             std::cout << m_generation_counter << " " << this->population.front().get_cost() << std::endl;
+            // Increment the generation counter
             m_generation_counter++;
         };
-
+        /// Optimize, with up to Ngen generations
         void optimize(std::size_t Ngen){
             this->initialize();
             for (auto igen = 0; igen < Ngen; ++igen){
